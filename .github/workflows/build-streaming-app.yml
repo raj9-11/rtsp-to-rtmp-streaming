@@ -882,8 +882,86 @@ jobs:
             </application>
         </manifest>
         EOF
+         
+    # Step 13: Create PROPER Android icons using Python
+    - name: Create proper Android icons
+      run: |
+        # Install Python PIL/Pillow for creating actual PNG files
+        pip install pillow
         
-    # Step 13: Create XML resources
+        # Create a Python script to generate proper PNG icons
+        cat > create_icons.py << 'EOF'
+        from PIL import Image, ImageDraw
+        import os
+        import base64
+        import io
+        
+        def create_icon(size, color="#6200EE"):
+            # Create RGBA image with transparent background
+            img = Image.new('RGBA', (size, size), (255, 255, 255, 0))
+            draw = ImageDraw.Draw(img)
+            
+            # Draw colored circle
+            margin = max(2, size // 12)
+            draw.ellipse([margin, margin, size-margin, size-margin], 
+                        fill=color, outline=color)
+            
+            # Draw white play triangle (streaming symbol)
+            triangle_size = size // 3
+            center_x, center_y = size // 2, size // 2
+            
+            points = [
+                (center_x - triangle_size//2, center_y - triangle_size//2),
+                (center_x - triangle_size//2, center_y + triangle_size//2),
+                (center_x + triangle_size//2, center_y)
+            ]
+            
+            draw.polygon(points, fill="white", outline="white")
+            return img
+        
+        # Icon densities and sizes
+        densities = {
+            'mdpi': 48,
+            'hdpi': 72,
+            'xhdpi': 96,
+            'xxhdpi': 144,
+            'xxxhdpi': 192
+        }
+        
+        # Create directories and generate proper PNG icons
+        for density, size in densities.items():
+            dir_path = f'app/src/main/res/mipmap-{density}'
+            os.makedirs(dir_path, exist_ok=True)
+            
+            icon = create_icon(size)
+            icon_path = f'{dir_path}/ic_launcher.png'
+            icon.save(icon_path, format='PNG', optimize=True)
+            
+            print(f"Created {density} icon: {icon_path} ({size}x{size})")
+            
+            # Verify file size
+            file_size = os.path.getsize(icon_path)
+            print(f"  File size: {file_size} bytes")
+        
+        print("All icons created successfully!")
+        EOF
+        
+        # Execute the Python script
+        python create_icons.py
+        
+        # Verify PNG files were created properly
+        echo "Verifying created icon files:"
+        for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+          file_path="app/src/main/res/mipmap-$density/ic_launcher.png"
+          if [ -f "$file_path" ]; then
+            file_info=$(file "$file_path")
+            echo "✅ $density: $file_info"
+          else
+            echo "❌ $density: File not found"
+          fi
+        done
+        
+    # Step 14: Create XML resources (rest same as before)
     - name: Create XML resources
       run: |
         mkdir -p app/src/main/res/xml
@@ -905,39 +983,6 @@ jobs:
                 <exclude domain="sharedpref" path="." />
             </device-transfer>
         </data-extraction-rules>
-        EOF
-        
-        # Create placeholder icons
-        for density in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
-          mkdir -p app/src/main/res/mipmap-$density
-          echo "Placeholder icon for $density" > app/src/main/res/mipmap-$density/ic_launcher.png
-        done
-        
-    # Step 14: Create ProGuard rules
-    - name: Create ProGuard rules
-      run: |
-        cat > app/proguard-rules.pro << 'EOF'
-        # LibVLC ProGuard rules (VERIFIED)
-        -keep class org.videolan.libvlc.** { *; }
-        -keep class org.videolan.medialibrary.** { *; }
-        -dontwarn org.videolan.**
-        
-        # WorkManager rules (VERIFIED 2.9.1)
-        -keep class androidx.work.** { *; }
-        -dontwarn androidx.work.**
-        
-        # Keep streaming service classes
-        -keep class com.libvlcstreamer.services.** { *; }
-        -keep class com.libvlcstreamer.receivers.** { *; }
-        -keep class com.libvlcstreamer.utils.** { *; }
-        
-        # Keep native methods
-        -keepclasseswithmembernames class * {
-            native <methods>;
-        }
-        
-        # Keep Timber logging
-        -keep class timber.log.** { *; }
         EOF
         
     # Step 15: Validate Gradle setup
