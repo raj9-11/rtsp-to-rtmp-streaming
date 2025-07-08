@@ -10,61 +10,59 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Check out the (empty) repo
-      - name: Checkout repo
-        uses: actions/checkout@v3
+      # 1) Check out the repo
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      # 2. Install JDK & Gradle CLI
+      # 2) Set up Java 17 and cache Gradle
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
 
+      # 3) Install Gradle CLI (for generating the wrapper)
       - name: Install Gradle CLI
         run: |
           sudo apt-get update
           sudo apt-get install -y gradle
 
-      # 3. Scaffold the Android stub project
+      # 4) Scaffold the Android stub project
       - name: Scaffold MarketStub project
         run: |
           set -e
-
           # Create folders
-          mkdir -p \
-            app/src/main/AndroidManifest.xml \
-            app/src/main/java/com/yourcompany/marketstub \
-            gradle/wrapper
+          mkdir -p app/src/main/java/com/yourcompany/marketstub
+          mkdir -p gradle/wrapper
 
-          # Root settings.gradle
-          cat > settings.gradle <<'EOF'
+          # settings.gradle
+          cat > settings.gradle << 'EOF'
           rootProject.name = "MarketStub"
           include ":app"
           EOF
 
           # Root build.gradle
-          cat > build.gradle <<'EOF'
+          cat > build.gradle << 'EOF'
           plugins {
             id 'com.android.application' version '8.1.0' apply false
           }
-
           task wrapper(type: Wrapper) {
             gradleVersion = '8.2'
           }
           EOF
 
-          # Gradle wrapper properties (minimal)
-          cat > gradle/wrapper/gradle-wrapper.properties <<'EOF'
+          # Gradle wrapper properties
+          cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
           distributionBase=GRADLE_USER_HOME
           distributionPath=wrapper/dists
           zipStoreBase=GRADLE_USER_HOME
           zipStorePath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.2-bin.zip
+          distributionUrl=https://services.gradle.org/distributions/gradle-8.2-bin.zip
           EOF
 
           # App module build.gradle
-          cat > app/build.gradle <<'EOF'
+          cat > app/build.gradle << 'EOF'
           apply plugin: 'com.android.application'
 
           android {
@@ -89,7 +87,7 @@ jobs:
           EOF
 
           # AndroidManifest.xml
-          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          cat > app/src/main/AndroidManifest.xml << 'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               package="com.yourcompany.marketstub">
 
@@ -107,8 +105,8 @@ jobs:
           </manifest>
           EOF
 
-          # MarketStubActivity.java
-          cat > app/src/main/java/com/yourcompany/marketstub/MarketStubActivity.java <<'EOF'
+          # Java source
+          cat > app/src/main/java/com/yourcompany/marketstub/MarketStubActivity.java << 'EOF'
           package com.yourcompany.marketstub;
 
           import android.app.Activity;
@@ -132,17 +130,21 @@ jobs:
           }
           EOF
 
-      # 4. Generate the Gradle wrapper scripts
+      # 5) Generate the Gradle wrapper
       - name: Generate Gradle wrapper
         run: gradle wrapper
 
-      # 5. Build a release APK
-      - name: Assemble Release APK
-        run: ./gradlew app:assembleRelease --no-daemon
+      # 6) Make the wrapper executable
+      - name: Make Gradlew Executable
+        run: chmod +x ./gradlew
 
-      # 6. Upload the built APK
-      - name: Upload artifact
+      # 7) Build a signed Release APK
+      - name: Assemble Release APK
+        run: ./gradlew clean app:assembleRelease --no-daemon
+
+      # 8) Upload the APK artifact
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MarketStub-release.apk
+          name: MarketStub-${{ github.run_number }}.apk
           path: app/build/outputs/apk/release/app-release.apk
