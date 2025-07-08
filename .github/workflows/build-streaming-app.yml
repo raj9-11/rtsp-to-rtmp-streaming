@@ -12,7 +12,7 @@ jobs:
     steps:
       # 1. Check out the (empty) repo
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       # 2. Install JDK & Gradle CLI
       - name: Set up JDK 17
@@ -142,7 +142,7 @@ jobs:
 
       # 6. Upload the built APK
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: MarketStub-release.apk
           path: app/build/outputs/apk/release/app-release.apk
